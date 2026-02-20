@@ -1,0 +1,56 @@
+var money 0
+color green
+text You find yourself in a bustling village.
+text There is a MARKET where people are selling their goods, a FORTUNE teller giving out free palm readings, and a FOUNTAIN in the middle of the square.
+input
+if input market
+    goto 13
+elseif input fortune
+    goto 33
+elseif input fountain
+    goto 45
+endif
+
+text You move into the market.
+text A vendor immediately gets your attention.
+text "Welcome fair lad! Are you new in town? Well I, the greatest antiquities dealer in all the realm, have something very special for you!
+text And because you are new in town I'm willing to give a discount! Only 7 dubloons for this fine lamp!
+text What do you say my new friend? Do you want to BUY it or RETURN?
+input
+if input buy
+    goto 24
+elseif input return
+    goto 4
+endif
+if var money 7
+    text I knew you'd like it! You are the proud owner a very rare item, indeed!
+    scene src/end.txt
+elseif var money 0
+    text What do you think you're doing you beggar!
+    text You have no money! Get out of here!
+    goto 4
+endif
+
+text You move toward the fortune teller hoping to get a reading.
+text "Welcome to my humble services, I am Madam Flick. Would you like a free READING or to RETURN?
+input
+if input reading
+    text Yes, I see great financial fortune in your future!
+    text You only have to go out and take it for yourself!
+    text I also see something to do with water... very strange indeed.
+    goto 4
+elseif input return
+    goto 4
+endif
+
+text You move toward the fountain in the center of the square.
+text You look into the water and initially see your reflection but as you look closer you see the fountain is filled with dubloons!
+text Would you TAKE some dubloons or RETURN to the village?
+input
+if input take
+    text You decide to humbly take only 7 dubloons from the fountain.
+    var money 7
+    goto 4
+elseif input return
+    goto 4
+endif

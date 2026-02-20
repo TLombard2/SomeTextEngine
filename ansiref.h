@@ -1,0 +1,7 @@
+#define _BLACK "\x1b[38;2;0;0;0m"
+#define _WHITE "\x1b[38;2;255;255;255m"
+#define _RED "\x1b[38;2;255;0;0m"
+#define _GREEN "\x1b[38;2;0;255;0m"
+#define _BLUE "\x1b[38;2;0;0;255m"
+#define _PINK "\x1b[38;2;255;0;255m"
+#define _RESET "\x1b[0m"
