@@ -4,8 +4,22 @@
 #include <errno.h>
 #include <string.h>
 #include "ansiref.h"
+#include <ctype.h>
 
 #define MAX_VAR 256
+
+// Case insensitive substring search to replace strstr
+char *ci_strstr(const char *haystack, const char *needle) {
+    if (!*needle) return (char *)haystack;
+    for (; *haystack; haystack++) {
+        const char *h = haystack, *n = needle;
+        while (*h && *n && tolower((unsigned char)*h) == tolower((unsigned char)*n)) {
+            h++; n++;
+        }
+        if (!*n) return (char *)haystack;
+    }
+    return NULL;
+}
 
 typedef struct var {
     int val;
@@ -76,10 +90,10 @@ int main () {
     while(1) {
         preLinePos = ftell(file);
         if (fgets(s, size, file) == NULL) break;
-        s[strcspn(s, "\r\n")] = '\0'; // Trim CR and LF (handles CRLF and LF)
+        s[strcspn(s, "\r\n")] = '\0'; // Removing \r handling CRLF
         
         /// IF STATEMENT
-        if ((txt = strstr(s, "endif")) != NULL) { // endif
+        if ((txt = ci_strstr(s, "endif")) != NULL) { // endif
             inIf = false;
             if (executing == false && inputMatched == false) {
                 printf(_RED"Try Again.\n"_RESET);
@@ -92,17 +106,21 @@ int main () {
             }
         }
 
-        if ((txt = strstr(s, "elseif")) != NULL && inIf == true) { // elseif
-            if ((txt = strstr(s, "input")) != NULL) {
+        if ((txt = ci_strstr(s, "elseif")) != NULL && inIf == true) { // elseif
+            if (inputMatched) {
+                executing = false;
+                continue;
+            }
+            if ((txt = ci_strstr(s, "input")) != NULL) {
                 size_t skip = strlen("input ");
                 memmove(txt, txt + skip, strlen(txt + skip) + 1);
-                if (strcmp(input, txt) == 0) {
+                if (ci_strstr(input, txt) != NULL) {
                     executing = true;
                     inputMatched = true;
                 } else {
                     executing = false;
                 }
-            } else if ((txt = strstr(s, "var")) != NULL) {
+            } else if ((txt = ci_strstr(s, "var")) != NULL) {
                 size_t skip = strlen("var ");
                 memmove(txt, txt + skip, strlen(txt + skip) + 1);
                 char *str1;
@@ -124,18 +142,50 @@ int main () {
             continue;
         }
 
-        if ((txt = strstr(s, "if")) != NULL && inIf == false) { // if
+        if ((txt = ci_strstr(s, "if")) != NULL && inIf == false) { // if
             inIf = true;
-            if ((txt = strstr(s, "input")) != NULL) { // input
+            if ((txt = ci_strstr(s, "input")) != NULL) { // input
                 size_t skip = strlen("input ");
                 memmove(txt, txt + skip, strlen(txt + skip) + 1);
-                 if (strcmp(input, txt) == 0) {
+
+                // Find earliest matching keyword in the input string
+                char *match = ci_strstr(input, txt);
+                int bestOffset = match ? (int)(match - input) : -1;
+                long bestBranchPos = match ? ftell(file) : -1;
+
+                // Forward-scan elseif input branches for a better match
+                char scanBuf[512];
+                while (1) {
+                    if (fgets(scanBuf, sizeof(scanBuf), file) == NULL) break;
+                    scanBuf[strcspn(scanBuf, "\r\n")] = '\0';
+                    if (strstr(scanBuf, "endif") != NULL) break;
+                    char *stxt;
+                    if ((stxt = strstr(scanBuf, "elseif")) != NULL &&
+                        (stxt = strstr(scanBuf, "input")) != NULL) {
+                        size_t eskip = strlen("input ");
+                        memmove(stxt, stxt + eskip, strlen(stxt + eskip) + 1);
+                        char *ematch = ci_strstr(input, stxt);
+                        if (ematch != NULL) {
+                            int offset = (int)(ematch - input);
+                            if (bestOffset == -1 || offset < bestOffset) {
+                                bestOffset = offset;
+                                bestBranchPos = ftell(file);
+                            }
+                        }
+                    }
+                }
+
+                if (bestOffset != -1) {
+                    fseek(file, bestBranchPos, SEEK_SET);
                     executing = true;
                     inputMatched = true;
                 } else {
-                    executing = false;
+                    inIf = false;
+                    executing = true;
+                    printf(_RED "Try Again.\n" _RESET);
+                    fseek(file, lastInputPos, SEEK_SET);
                 }
-            } else if (((txt = strstr(s, "var")) != NULL)) { // var
+            } else if (((txt = ci_strstr(s, "var")) != NULL)) { // var
                 size_t skip = strlen("var ");
                 memmove(txt, txt + skip, strlen(txt + skip) + 1); // remove var
                 char *str1;
@@ -155,7 +205,7 @@ int main () {
                 }
             }
             continue;
-        } else if ((txt = strstr(s, "if")) != NULL && inIf == true) {
+        } else if ((txt = ci_strstr(s, "if")) != NULL && inIf == true) {
             continue;
         }
 
@@ -164,7 +214,7 @@ int main () {
         }
 
         // Change text color
-        if ((txt = strstr(s, "color")) != NULL) {
+        if ((txt = ci_strstr(s, "color")) != NULL) {
             size_t skip = strlen("color ");
             memmove(txt, txt + skip, strlen(txt + skip) + 1);
             if ((strcmp(txt, "red")) == 0) {
@@ -176,19 +226,20 @@ int main () {
             }
         }
         // Text handling
-        if ((txt = strstr(s, "text")) != NULL) {
+        if ((txt = ci_strstr(s, "text")) != NULL) {
             // Add if a word is all upper case then set color to pink.
             printf("%s%s" _RESET "\n", color, txt + strlen("text "));
         }
 
         // Input handling
-        if ((txt = strstr(s, "input")) != NULL) {
-            scanf("%255s", input);
+        if ((txt = ci_strstr(s, "input")) != NULL) {
+            fgets(input, sizeof(input), stdin);
+            input[strcspn(input, "\r\n")] = '\0';
             lastInputPos = preLinePos;
         }
 
         // Variable handling
-        if ((txt = strstr(s, "var"))!= NULL) {
+        if ((txt = ci_strstr(s, "var"))!= NULL) {
             size_t skip = strlen("var ");
             memmove(txt, txt + skip, strlen(txt + skip) + 1); // remove var
             char *str1;
@@ -217,7 +268,7 @@ int main () {
             continue;
         }
         // goto handling
-        if ((txt = strstr(s, "goto")) != NULL) {
+        if ((txt = ci_strstr(s, "goto")) != NULL) {
             size_t skip = strlen("goto ");
             memmove(txt, txt + skip, strlen(txt + skip) + 1);
             char *endptr;
@@ -229,7 +280,7 @@ int main () {
         }
 
         // scene handling
-        if ((txt = strstr(s, "scene")) != NULL) {
+        if ((txt = ci_strstr(s, "scene")) != NULL) {
             size_t skip = strlen("scene ");
             memmove(txt, txt + skip, strlen(txt + skip) + 1);
             fclose(file);
