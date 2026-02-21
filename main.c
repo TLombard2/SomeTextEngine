@@ -41,7 +41,7 @@ FILE* openFile(const char *filename) {
 }
 
 // Gets an array of line nums for use with goto
-int getLineNums (FILE *f, size_t zu, char *s, long *offsets) {
+void getLineNums (FILE *f, size_t zu, char *s, long *offsets) {
     long pos = ftell(f);
     int lineCount = 0;
     while (fgets(s, zu, f) != NULL) {
@@ -60,7 +60,7 @@ int main () {
     char *s = malloc(size + 1);
     long lineOffsets[1024];
     var pairs[MAX_VAR] = {0};
-    char *color;
+    char *color = _GREEN;
 
     getLineNums(file, size, s, lineOffsets);
 
@@ -68,7 +68,6 @@ int main () {
     bool executing = true;
     long lastInputPos;
     bool inputMatched = false;
-    bool varCheck = false;
 
     char *txt;
     char input[256];
@@ -77,7 +76,7 @@ int main () {
     while(1) {
         preLinePos = ftell(file);
         if (fgets(s, size, file) == NULL) break;
-        s[strcspn(s, "\n")] = '\0'; // Removes \n to be added manually - prevents last line from not having a \n
+        s[strcspn(s, "\r\n")] = '\0'; // Trim CR and LF (handles CRLF and LF)
         
         /// IF STATEMENT
         if ((txt = strstr(s, "endif")) != NULL) { // endif
@@ -95,7 +94,8 @@ int main () {
 
         if ((txt = strstr(s, "elseif")) != NULL && inIf == true) { // elseif
             if ((txt = strstr(s, "input")) != NULL) {
-                memmove(txt, txt + strlen("input "), strlen(txt));
+                size_t skip = strlen("input ");
+                memmove(txt, txt + skip, strlen(txt + skip) + 1);
                 if (strcmp(input, txt) == 0) {
                     executing = true;
                     inputMatched = true;
@@ -103,7 +103,8 @@ int main () {
                     executing = false;
                 }
             } else if ((txt = strstr(s, "var")) != NULL) {
-                memmove(txt, txt + strlen("var "), strlen(txt));
+                size_t skip = strlen("var ");
+                memmove(txt, txt + skip, strlen(txt + skip) + 1);
                 char *str1;
                 char *str2;
                 str1 = strtok(txt, " ");
@@ -114,7 +115,6 @@ int main () {
                     if (pairs[i].s != NULL && strcmp(pairs[i].s, str1) == 0) {
                         if (val == pairs[i].val) {
                             executing = true;
-                            varCheck = true;
                         } else {
                             executing = false;
                         }
@@ -127,7 +127,8 @@ int main () {
         if ((txt = strstr(s, "if")) != NULL && inIf == false) { // if
             inIf = true;
             if ((txt = strstr(s, "input")) != NULL) { // input
-                memmove(txt, txt + strlen("input "), strlen(txt));
+                size_t skip = strlen("input ");
+                memmove(txt, txt + skip, strlen(txt + skip) + 1);
                  if (strcmp(input, txt) == 0) {
                     executing = true;
                     inputMatched = true;
@@ -135,7 +136,8 @@ int main () {
                     executing = false;
                 }
             } else if (((txt = strstr(s, "var")) != NULL)) { // var
-                memmove(txt, txt + strlen("var "), strlen(txt)); // remove var
+                size_t skip = strlen("var ");
+                memmove(txt, txt + skip, strlen(txt + skip) + 1); // remove var
                 char *str1;
                 char *str2;
                 str1 = strtok(txt, " ");
@@ -146,7 +148,6 @@ int main () {
                     if (pairs[i].s != NULL && strcmp(pairs[i].s, str1) == 0) {
                         if (val == pairs[i].val) {
                             executing = true;
-                            varCheck = true;
                         } else {
                             executing = false;
                         }
@@ -164,7 +165,8 @@ int main () {
 
         // Change text color
         if ((txt = strstr(s, "color")) != NULL) {
-            memmove(txt, txt + strlen("color "), strlen(txt));
+            size_t skip = strlen("color ");
+            memmove(txt, txt + skip, strlen(txt + skip) + 1);
             if ((strcmp(txt, "red")) == 0) {
                 color = _RED;
             } else if ((strcmp(txt, "blue")) == 0) {
@@ -187,7 +189,8 @@ int main () {
 
         // Variable handling
         if ((txt = strstr(s, "var"))!= NULL) {
-            memmove(txt, txt + strlen("var "), strlen(txt)); // remove var
+            size_t skip = strlen("var ");
+            memmove(txt, txt + skip, strlen(txt + skip) + 1); // remove var
             char *str1;
             char *str2;
             str1 = strtok(txt, " ");
@@ -215,7 +218,8 @@ int main () {
         }
         // goto handling
         if ((txt = strstr(s, "goto")) != NULL) {
-            memmove(txt, txt + strlen("goto "), strlen(txt));
+            size_t skip = strlen("goto ");
+            memmove(txt, txt + skip, strlen(txt + skip) + 1);
             char *endptr;
             int num = strtol(txt, &endptr, 10);
             inIf = false;
@@ -226,7 +230,8 @@ int main () {
 
         // scene handling
         if ((txt = strstr(s, "scene")) != NULL) {
-            memmove(txt, txt + strlen("scene "), strlen(txt));
+            size_t skip = strlen("scene ");
+            memmove(txt, txt + skip, strlen(txt + skip) + 1);
             fclose(file);
             file = openFile(txt);
             size = getFileSize(file, txt);
